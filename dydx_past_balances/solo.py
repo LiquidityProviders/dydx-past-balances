@@ -54,7 +54,10 @@ class Solo(Contract):
                 elif i == 1:
                     return_obj[inner_i]['principal'] = val[inner_i][1]/10**18
                 else:
-                    return_obj[inner_i]['total_bal'] = val[inner_i][1]/10**18
+                    if inner_i == 2:
+                        return_obj[inner_i]['total_bal'] = val[inner_i][1]/10**6
+                    else:
+                        return_obj[inner_i]['total_bal'] = val[inner_i][1]/10**18
 
         return return_obj
 
