@@ -1,4 +1,4 @@
-#Dydx past balances
+# Dydx past balances
 The purpose of this repo is to query Dydx(v1) balances historically from the Ethereum blockchain.
 
 The market configuration that is set by Dydx is also hard coded in `dydx-past-balances/main.py`:
