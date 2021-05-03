@@ -5,7 +5,7 @@ import json
 import requests
 import argparse
 from dydx_past_balances.solo import Solo
-from web3 import Web3
+from web3 import Web3, HTTPProvider
 from pprint import pprint
 from pymaker import Address, web3_via_http, Wad
 from pymaker.util import hexstring_to_bytes
@@ -27,7 +27,7 @@ class DydxHistoricBalances:
                             help="DYDX endpoint URI with port (default: 'https://api.dydx.exchange')")
 
         parser.add_argument("--addresses-config", required=True, type=argparse.FileType('r'),
-                help="configuration file to identify DYDX addresses.")
+                            help="configuration file to identify DYDX addresses.")
 
         parser.add_argument('--block-number-to-query', type=int, default=None,
                             help="block from which to pull at historical Dydx balances")
@@ -36,7 +36,10 @@ class DydxHistoricBalances:
         self.arguments = parser.parse_args(args)
         self.dydx_endpoint = self.arguments.dydx_host
         self.block_number = self.arguments.block_number_to_query
-        self.web3 = web3_via_http(endpoint_uri=self.arguments.rpc_host, timeout=30, http_pool_size=100)
+        self.web3 = Web3(HTTPProvider(endpoint_uri=self.arguments.rpc_host))
+        print(f"URL (Ethereum Node) Endpoint - {self.arguments.rpc_host}")
+        print(f"Client Verion - {self.web3.clientVersion} ")
+        print(f"The blocknumber where balances are requested: {self.block_number}")
 
         self.markets = {
             0: {'symbol': 'ETH', 'num': Wad.from_number(0)},
@@ -67,30 +70,39 @@ class DydxHistoricBalances:
         return int(result['accounts'][0]['number'])
 
 
-    def _combine_acc_data(self, margin_data, spot_data, markets):
+    def _combine_acc_data(self, margin_data, spot_data, markets, total_obj):
 
-        totaled_data = {}
+        acc_data = {}
         for market in margin_data:
-            totaled_data[markets[market]['symbol']] = {
+            acc_data[markets[market]['symbol']] = {
                     'token_address': margin_data[market]['token_address'],
                     'balance':  margin_data[market]['total_bal'] + spot_data[market]['total_bal']
                     }
+            if total_obj.get(markets[market]['symbol']):
+                total_obj[markets[market]['symbol']] += (margin_data[market]['total_bal'] + spot_data[market]['total_bal'])
+            else:
+                total_obj[markets[market]['symbol']] = (margin_data[market]['total_bal'] + spot_data[market]['total_bal'])
 
-        return totaled_data
+
+        return acc_data, total_obj
 
 
     def main(self):
         return_obj = {}
+        total_obj = {}
 
         for address in self.addresses:
             acc_nonce = self._get_acc_nonce(address)
 
             margin_acc = self.solo.get_account_balances(address, Wad.from_number(0).value, self.block_number)
             spot_acc = self.solo.get_account_balances(address, acc_nonce, self.block_number)
-            return_obj[address] = self._combine_acc_data(margin_acc, spot_acc, self.markets)
+            return_obj[address],total_obj = self._combine_acc_data(margin_acc, spot_acc, self.markets, total_obj)
+
 
 
         pprint(return_obj)
+        print(f"// TOTAL// :")
+        pprint(total_obj)
 
 
 if __name__ == '__main__':
